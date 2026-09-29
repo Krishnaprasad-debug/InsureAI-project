@@ -10,7 +10,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, type Claim, type Prediction } from '../lib/supabase';
+import { type Claim, type Prediction } from '../lib/supabase';
 import { StatCard } from '../components/ui/StatCard';
 import { Card, CardBody, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -18,7 +18,9 @@ import { StatusBadge } from '../components/ui/Misc';
 import { SkeletonCard } from '../components/ui/Skeleton';
 import { formatDate, timeAgo } from '../lib/utils';
 
-const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444'];
+import { fetchAllClaimsMerged, fetchAllPredictionsMerged } from '../lib/claimsSync';
+
+const COLORS = ['#10b981', '#ef4444', '#f97316']; // Green, Red, Orange
 
 export function DashboardPage() {
   const { profile } = useAuth();
@@ -27,24 +29,33 @@ export function DashboardPage() {
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loadData = async () => {
+    if (!profile?.id) return;
+    const [claimsData, predData] = await Promise.all([
+      fetchAllClaimsMerged(profile.id, false),
+      fetchAllPredictionsMerged(profile.id, false),
+    ]);
+    setClaims(claimsData);
+    setPredictions(predData);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    (async () => {
-      if (!profile?.id) return;
-      const [{ data: claimsData }, { data: predData }] = await Promise.all([
-        supabase.from('claims').select('*').eq('user_id', profile.id).order('created_at', { ascending: false }),
-        supabase.from('predictions').select('*').eq('user_id', profile.id).order('created_at', { ascending: false }),
-      ]);
-      setClaims(claimsData as Claim[] || []);
-      setPredictions(predData as Prediction[] || []);
-      setLoading(false);
-    })();
+    loadData();
+    const handleSync = () => { loadData(); };
+    window.addEventListener('insureai_claims_updated', handleSync);
+    window.addEventListener('storage', handleSync);
+    return () => {
+      window.removeEventListener('insureai_claims_updated', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
   }, [profile?.id]);
 
   const stats = {
     total: claims.length,
-    approved: claims.filter((c) => c.status === 'approved').length,
-    rejected: claims.filter((c) => c.status === 'rejected').length,
-    pending: claims.filter((c) => c.status === 'pending' || c.status === 'under_review').length,
+    approved: claims.filter((c) => c.status === 'approved' || c.company_decision === 'Approved').length,
+    rejected: claims.filter((c) => c.status === 'rejected' || c.company_decision === 'Rejected').length,
+    pending: claims.filter((c) => (c.status === 'pending' || c.status === 'under_review') && c.company_decision !== 'Approved' && c.company_decision !== 'Rejected').length,
     avgConfidence: predictions.length > 0
       ? Math.round(predictions.reduce((sum, p) => sum + p.confidence, 0) / predictions.length * 100) / 100
       : 0,
@@ -54,7 +65,7 @@ export function DashboardPage() {
     { name: 'Approved', value: stats.approved },
     { name: 'Rejected', value: stats.rejected },
     { name: 'Pending', value: stats.pending },
-  ].filter((d) => d.value > 0);
+  ];
 
   // Monthly chart data
   const monthlyData = (() => {
@@ -103,8 +114,8 @@ export function DashboardPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard label="Total Claims" value={stats.total} icon={<FileText className="w-5 h-5" />} color="primary" />
-          <StatCard label="Approved" value={stats.approved} icon={<CheckCircle2 className="w-5 h-5" />} color="accent" />
+          <StatCard label="Total Claims" value={stats.total} icon={<FileText className="w-5 h-5" />} color="secondary" />
+          <StatCard label="Approved" value={stats.approved} icon={<CheckCircle2 className="w-5 h-5" />} color="primary" />
           <StatCard label="Rejected" value={stats.rejected} icon={<XCircle className="w-5 h-5" />} color="danger" />
           <StatCard label="Pending" value={stats.pending} icon={<Clock className="w-5 h-5" />} color="warning" />
         </div>
@@ -125,8 +136,8 @@ export function DashboardPage() {
                 <AreaChart data={monthlyData}>
                   <defs>
                     <linearGradient id="claimsGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#2563eb" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#2563eb" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#9333ea" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#9333ea" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="approvedGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
@@ -144,7 +155,7 @@ export function DashboardPage() {
                     }}
                   />
                   <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Area type="monotone" dataKey="claims" stroke="#2563eb" fill="url(#claimsGrad)" strokeWidth={2} />
+                  <Area type="monotone" dataKey="claims" stroke="#9333ea" fill="url(#claimsGrad)" strokeWidth={2} />
                   <Area type="monotone" dataKey="approved" stroke="#10b981" fill="url(#approvedGrad)" strokeWidth={2} />
                 </AreaChart>
               </ResponsiveContainer>
@@ -159,7 +170,7 @@ export function DashboardPage() {
             <CardTitle>Claim Status</CardTitle>
           </CardHeader>
           <CardBody>
-            {statusData.length > 0 ? (
+            {statusData.some(d => d.value > 0) ? (
               <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
                   <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={60} outerRadius={100} paddingAngle={3}>
@@ -181,7 +192,7 @@ export function DashboardPage() {
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>Prediction Accuracy</CardTitle>
+              <CardTitle>Average Prediction Confidence</CardTitle>
               <Target className="w-5 h-5 text-gray-400" />
             </div>
           </CardHeader>

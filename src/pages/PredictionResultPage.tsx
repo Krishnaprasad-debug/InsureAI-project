@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   CheckCircle2, XCircle, Download, Share2, ArrowRight, Brain,
-  TrendingUp, TrendingDown, AlertCircle, FileText,
+  TrendingUp, TrendingDown, AlertCircle, FileText, ShieldAlert,
+  RotateCw, ArrowLeft,
 } from 'lucide-react';
 import {
   RadialBarChart, RadialBar, PolarAngleAxis,
@@ -11,63 +12,251 @@ import {
 } from 'recharts';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { supabase, type Prediction, type Claim } from '../lib/supabase';
+import { type Prediction, type Claim } from '../lib/supabase';
+import { fetchSingleClaimMerged, fetchSinglePredictionMerged } from '../lib/claimsSync';
 import { Card, CardBody, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { formatDate, formatDateTime, downloadFile } from '../lib/utils';
 
 export function PredictionResultPage() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, isAdmin, isCompany } = useAuth();
   const { toast } = useToast();
-  const [prediction, setPrediction] = useState<Prediction | null>(location.state?.prediction || null);
+
   const [claim, setClaim] = useState<Claim | null>(null);
-  const [loading, setLoading] = useState(!prediction);
+  const [prediction, setPrediction] = useState<Prediction | null>(location.state?.prediction || null);
+  const [status, setStatus] = useState<'loading' | 'success' | 'not_found' | 'unauthorized' | 'error'>('loading');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  const loadData = useCallback(async () => {
+    if (!id) {
+      console.warn('[PredictionResultPage] No claim ID in route params');
+      setStatus('not_found');
+      return;
+    }
+
+    setStatus('loading');
+    setErrorMessage('');
+
+    try {
+      console.log(`[PredictionResultPage] Loading claim "${id}" | User: ${profile?.id || 'anonymous'}`);
+
+      // 1. Fetch the claim by ID or claim_number
+      const claimData = await fetchSingleClaimMerged(id);
+
+      if (!claimData) {
+        console.warn(`[PredictionResultPage] Claim not found for identifier: ${id}`);
+        setClaim(null);
+        setPrediction(null);
+        setStatus('not_found');
+        return;
+      }
+
+      setClaim(claimData);
+
+      // 2. Authentication & Ownership Verification
+      const isSampleClaim =
+        claimData.id === 'claim-91mcf0xw' ||
+        claimData.id === 'claim-nph8gbet' ||
+        claimData.claim_number === 'CLM-91MCF0XW' ||
+        claimData.claim_number === 'CLM-NPH8GBET';
+
+      const isOwner = isSampleClaim || (profile?.id && claimData.user_id === profile.id);
+      const isStaff = isAdmin || isCompany;
+
+      if (!isOwner && !isStaff && profile?.id) {
+        console.warn(`[PredictionResultPage] Unauthorized attempt by user ${profile.id} for claim ${claimData.id}`);
+        setStatus('unauthorized');
+        return;
+      }
+
+      // 3. Fetch Prediction (by claim.id and claim.claim_number)
+      let predData = await fetchSinglePredictionMerged(claimData.id, claimData.claim_number);
+
+      // Fallback to location state prediction if matching
+      if (!predData && location.state?.prediction) {
+        const statePred = location.state.prediction as Prediction;
+        if (statePred.claim_id === claimData.id || statePred.claim_id === claimData.claim_number || statePred.id === claimData.id) {
+          predData = statePred;
+        }
+      }
+
+      if (predData) {
+        console.log(`[PredictionResultPage] Prediction loaded for claim ${claimData.claim_number}:`, predData.prediction, `(${predData.confidence}%)`);
+        setPrediction(predData);
+        setStatus('success');
+      } else {
+        console.info(`[PredictionResultPage] No prediction generated for claim ${claimData.claim_number}`);
+        setPrediction(null);
+        setStatus('not_found');
+      }
+    } catch (err: any) {
+      console.error('[PredictionResultPage] Error loading prediction:', err);
+      setErrorMessage(err?.message || 'Unable to load prediction. Please try again.');
+      setStatus('error');
+    }
+  }, [id, profile?.id, isAdmin, isCompany, location.state]);
 
   useEffect(() => {
-    (async () => {
-      if (!id) return;
-      const [{ data: claimData }, { data: predData }] = await Promise.all([
-        supabase.from('claims').select('*').eq('id', id).maybeSingle(),
-        supabase.from('predictions').select('*').eq('claim_id', id).maybeSingle(),
-      ]);
-      if (claimData) setClaim(claimData as Claim);
-      if (predData) setPrediction(predData as Prediction);
-      setLoading(false);
-    })();
-  }, [id]);
+    loadData();
+  }, [loadData, reloadKey]);
 
-  if (loading) {
+  // Loading state
+  if (status === 'loading') {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-2 border-primary-600 border-t-transparent rounded-full animate-spin" />
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center p-6">
+        <div className="w-10 h-10 border-3 border-primary-600 border-t-transparent rounded-full animate-spin mb-4" />
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">Loading prediction...</h3>
+        <p className="text-sm text-gray-500 mt-1 max-w-sm">
+          Retrieving claim details and AI inference results.
+        </p>
       </div>
     );
   }
 
-  if (!prediction || !claim) {
+  // Unauthorized state
+  if (status === 'unauthorized') {
     return (
-      <div className="text-center py-16">
-        <AlertCircle className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-        <p className="text-gray-500 mb-4">Prediction not found</p>
-        <Button onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
+      <div className="max-w-md mx-auto my-12 text-center">
+        <Card className="p-8">
+          <div className="w-14 h-14 rounded-2xl bg-danger-50 dark:bg-danger-900/30 text-danger-600 flex items-center justify-center mx-auto mb-4">
+            <ShieldAlert className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold mb-2">Access Denied</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            You do not have permission to view predictions for this claim.
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button onClick={() => navigate('/claims')}>
+              <ArrowLeft className="w-4 h-4" />
+              Back to Claim History
+            </Button>
+          </div>
+        </Card>
       </div>
     );
   }
 
-  const isApproved = prediction.prediction === 'Approved';
-  const gaugeData = [{ name: 'confidence', value: prediction.confidence, fill: isApproved ? '#10b981' : '#ef4444' }];
+  // Error state
+  if (status === 'error') {
+    return (
+      <div className="max-w-md mx-auto my-12 text-center">
+        <Card className="p-8">
+          <div className="w-14 h-14 rounded-2xl bg-danger-50 dark:bg-danger-900/30 text-danger-600 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold mb-2">Unable to Load Prediction</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            {errorMessage || 'A network error or database issue occurred while retrieving the prediction. Please try again.'}
+          </p>
+          <div className="flex gap-3 justify-center">
+            <Button variant="outline" onClick={() => setReloadKey((k) => k + 1)}>
+              <RotateCw className="w-4 h-4" />
+              Try Again
+            </Button>
+            <Button onClick={() => navigate('/claims')}>
+              Back to Claims
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  // Not Found State
+  if (status === 'not_found' || !prediction || !claim) {
+    if (claim) {
+      return (
+        <div className="max-w-lg mx-auto my-12">
+          <Card className="p-8 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-amber-50 dark:bg-amber-900/30 text-amber-600 flex items-center justify-center mx-auto mb-4">
+              <Brain className="w-7 h-7" />
+            </div>
+            <h2 className="text-xl font-bold mb-2">Prediction Unavailable</h2>
+            <p className="text-sm text-gray-500 mb-6">
+              Prediction has not been generated for this claim.
+            </p>
+
+            <div className="bg-gray-50 dark:bg-gray-800/60 rounded-xl p-4 text-left text-sm space-y-2 mb-6 border border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Claim Number:</span>
+                <span className="font-semibold text-primary-600 dark:text-primary-400">{claim.claim_number}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Status:</span>
+                <span className="capitalize font-medium">{claim.status}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Vehicle:</span>
+                <span>{claim.vehicle_details?.vehicleBrand || '—'} {claim.vehicle_details?.vehicleModel || ''}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Submitted:</span>
+                <span>{formatDate(claim.created_at)}</span>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-center">
+              <Button variant="outline" onClick={() => navigate('/claims')}>
+                <ArrowLeft className="w-4 h-4" />
+                Back to Claims
+              </Button>
+              <Button onClick={() => navigate(`/claims/${claim.id}`)}>
+                <FileText className="w-4 h-4" />
+                View Claim Details
+              </Button>
+            </div>
+          </Card>
+        </div>
+      );
+    }
+
+    return (
+      <div className="max-w-md mx-auto my-12 text-center">
+        <Card className="p-8">
+          <div className="w-14 h-14 rounded-2xl bg-gray-100 dark:bg-gray-800 text-gray-400 flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-xl font-bold mb-2">Claim Not Found</h2>
+          <p className="text-sm text-gray-500 mb-6">
+            We could not find any claim matching "{id}". Please check the URL or return to your claims.
+          </p>
+          <div className="flex justify-center">
+            <Button onClick={() => navigate('/claims')}>
+              <ArrowLeft className="w-4 h-4" />
+              Back to Claims
+            </Button>
+          </div>
+        </Card>
+      </div>
+    );
+  }
+
+  const isApproved = (prediction.prediction as string) === 'Claim Likely' || (prediction.prediction as string) === 'Approved';
+  const confidence = typeof prediction.confidence === 'number' ? prediction.confidence : 80;
+  const gaugeData = [{ name: 'confidence', value: confidence, fill: isApproved ? '#10b981' : '#ef4444' }];
+
+  const probApproved = typeof prediction.probability_approved === 'number'
+    ? prediction.probability_approved
+    : isApproved ? confidence : 100 - confidence;
+  const probRejected = typeof prediction.probability_rejected === 'number'
+    ? prediction.probability_rejected
+    : 100 - probApproved;
+
   const pieData = [
-    { name: 'Approved', value: prediction.probability_approved },
-    { name: 'Rejected', value: prediction.probability_rejected },
+    { name: 'Approved', value: probApproved },
+    { name: 'Rejected', value: probRejected },
   ];
-  const featureData = prediction.feature_importance.map((f) => ({
-    name: f.label,
-    value: f.importance * 100,
-    direction: f.direction,
+
+  const rawFeatures = Array.isArray(prediction.feature_importance) ? prediction.feature_importance : [];
+  const featureData = rawFeatures.map((f) => ({
+    name: f.label || f.feature,
+    value: Math.round((f.importance || 0) * 100),
+    direction: f.direction || 'positive',
   }));
 
   const handleDownload = () => {
@@ -119,13 +308,13 @@ export function PredictionResultPage() {
           animate={{ opacity: 1, y: 0 }}
           className="lg:col-span-1"
         >
-          <Card className={`overflow-hidden ${isApproved ? 'border-accent-200 dark:border-accent-800' : 'border-danger-200 dark:border-danger-800'}`}>
-            <div className={`p-6 text-center ${isApproved ? 'bg-gradient-to-br from-accent-50 to-white dark:from-accent-900/20 dark:to-gray-900' : 'bg-gradient-to-br from-danger-50 to-white dark:from-danger-900/20 dark:to-gray-900'}`}>
-              <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center ${isApproved ? 'bg-accent-100 dark:bg-accent-900/40' : 'bg-danger-100 dark:bg-danger-900/40'}`}>
-                {isApproved ? <CheckCircle2 className="w-9 h-9 text-accent-600" /> : <XCircle className="w-9 h-9 text-danger-600" />}
+          <Card className={`overflow-hidden ${isApproved ? 'border-primary-200 dark:border-primary-800' : 'border-danger-200 dark:border-danger-800'}`}>
+            <div className={`p-6 text-center ${isApproved ? 'bg-gradient-to-br from-primary-50 to-white dark:from-primary-900/20 dark:to-gray-900' : 'bg-gradient-to-br from-danger-50 to-white dark:from-danger-900/20 dark:to-gray-900'}`}>
+              <div className={`w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center ${isApproved ? 'bg-primary-100 dark:bg-primary-900/40' : 'bg-danger-100 dark:bg-danger-900/40'}`}>
+                {isApproved ? <CheckCircle2 className="w-9 h-9 text-primary-600" /> : <XCircle className="w-9 h-9 text-danger-600" />}
               </div>
               <p className="text-sm text-gray-500 mb-1">AI Prediction</p>
-              <h2 className={`text-3xl font-bold mb-2 ${isApproved ? 'text-accent-600' : 'text-danger-600'}`}>
+              <h2 className={`text-3xl font-bold mb-2 ${isApproved ? 'text-primary-600' : 'text-danger-600'}`}>
                 {prediction.prediction}
               </h2>
               <div className="flex items-center justify-center gap-2">
@@ -148,7 +337,7 @@ export function PredictionResultPage() {
                   initial={{ width: 0 }}
                   animate={{ width: `${prediction.confidence}%` }}
                   transition={{ duration: 1, ease: 'easeOut' }}
-                  className={`h-full rounded-full ${isApproved ? 'bg-accent-500' : 'bg-danger-500'}`}
+                  className={`h-full rounded-full ${isApproved ? 'bg-primary-500' : 'bg-danger-500'}`}
                 />
               </div>
               <p className="text-xs text-gray-400 mt-2">
@@ -168,14 +357,17 @@ export function PredictionResultPage() {
               {/* Gauge */}
               <div>
                 <p className="text-sm text-gray-500 mb-2 text-center">Confidence Gauge</p>
-                <ResponsiveContainer width="100%" height={200}>
-                  <RadialBarChart cx="50%" cy="50%" innerRadius="70%" outerRadius="100%" data={gaugeData} startAngle={90} endAngle={-270}>
-                    <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
-                    <RadialBar background={{ fill: '#e5e7eb' }} dataKey="value" cornerRadius={10} />
-                  </RadialBarChart>
-                </ResponsiveContainer>
-                <div className="text-center -mt-12">
-                  <span className="text-3xl font-bold">{prediction.confidence}%</span>
+                <div className="relative flex items-center justify-center">
+                  <ResponsiveContainer width="100%" height={200}>
+                    <RadialBarChart cx="50%" cy="50%" innerRadius="70%" outerRadius="100%" data={gaugeData} startAngle={90} endAngle={-270}>
+                      <PolarAngleAxis type="number" domain={[0, 100]} angleAxisId={0} tick={false} />
+                      <RadialBar background={{ fill: '#e5e7eb' }} dataKey="value" cornerRadius={10} />
+                    </RadialBarChart>
+                  </ResponsiveContainer>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-2xl font-bold text-gray-900 dark:text-white">{prediction.confidence}%</span>
+                    <span className="text-xs text-gray-400 font-medium">Confidence</span>
+                  </div>
                 </div>
               </div>
               {/* Pie */}
@@ -191,7 +383,7 @@ export function PredictionResultPage() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="flex justify-center gap-4 text-xs">
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-accent-500" />Approved ({prediction.probability_approved}%)</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-primary-500" />Approved ({prediction.probability_approved}%)</span>
                   <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-danger-500" />Rejected ({prediction.probability_rejected}%)</span>
                 </div>
               </div>
@@ -234,8 +426,8 @@ export function PredictionResultPage() {
                   transition={{ delay: i * 0.1 }}
                   className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800/50"
                 >
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${f.direction === 'positive' ? 'bg-accent-100 dark:bg-accent-900/30' : 'bg-danger-100 dark:bg-danger-900/30'}`}>
-                    {f.direction === 'positive' ? <TrendingUp className="w-4 h-4 text-accent-600" /> : <TrendingDown className="w-4 h-4 text-danger-600" />}
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${f.direction === 'positive' ? 'bg-primary-100 dark:bg-primary-900/30' : 'bg-danger-100 dark:bg-danger-900/30'}`}>
+                    {f.direction === 'positive' ? <TrendingUp className="w-4 h-4 text-primary-600" /> : <TrendingDown className="w-4 h-4 text-danger-600" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium">{f.label}</p>
@@ -299,6 +491,7 @@ export function PredictionResultPage() {
 }
 
 function generateReport(claim: Claim, prediction: Prediction, userName: string): string {
+  const featureList = Array.isArray(prediction.feature_importance) ? prediction.feature_importance : [];
   const lines = [
     '========================================',
     '       InsureAI - Claim Report          ',
@@ -314,10 +507,10 @@ function generateReport(claim: Claim, prediction: Prediction, userName: string):
     `Risk Level: ${prediction.risk_level}`,
     `Probability Approved: ${prediction.probability_approved}%`,
     `Probability Rejected: ${prediction.probability_rejected}%`,
-    `Model: ${prediction.model_version}`,
+    `Model: ${prediction.model_version || 'xgboost-v1.0'}`,
     '',
     '--- KEY FACTORS ---',
-    ...prediction.feature_importance.map((f) => `  ${f.label}: ${f.value} (${f.direction}, ${f.importance * 100}% impact)`),
+    ...featureList.map((f) => `  ${f.label || f.feature}: ${f.value} (${f.direction}, ${Math.round((f.importance || 0) * 100)}% impact)`),
     '',
     '--- CLAIM STATUS ---',
     `Status: ${claim.status}`,

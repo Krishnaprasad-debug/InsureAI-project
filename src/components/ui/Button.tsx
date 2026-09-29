@@ -18,7 +18,7 @@ const variants: Record<Variant, string> = {
   outline: 'border border-gray-300 dark:border-gray-700 bg-transparent hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300',
   ghost: 'bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300',
   danger: 'bg-danger-600 text-white hover:bg-danger-700 shadow-sm shadow-danger-600/20',
-  success: 'bg-accent-600 text-white hover:bg-accent-700 shadow-sm shadow-accent-600/20',
+  success: 'bg-primary-600 text-white hover:bg-primary-700 shadow-sm shadow-primary-600/20',
 };
 
 const sizes: Record<Size, string> = {

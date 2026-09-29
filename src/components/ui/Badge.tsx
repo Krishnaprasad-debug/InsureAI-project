@@ -16,7 +16,7 @@ const variants: Record<Variant, string> = {
   success: 'bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300',
   warning: 'bg-warning-100 text-warning-600 dark:bg-warning-500/20 dark:text-warning-400',
   danger: 'bg-danger-100 text-danger-700 dark:bg-danger-900/40 dark:text-danger-300',
-  info: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  info: 'bg-secondary-100 text-secondary-700 dark:bg-secondary-900/40 dark:text-secondary-300',
   outline: 'border border-gray-300 dark:border-gray-700 text-gray-600 dark:text-gray-400',
 };
 
@@ -26,7 +26,7 @@ const dotColors: Record<Variant, string> = {
   success: 'bg-accent-500',
   warning: 'bg-warning-500',
   danger: 'bg-danger-500',
-  info: 'bg-blue-500',
+  info: 'bg-secondary-500',
   outline: 'bg-gray-400',
 };
 

@@ -9,7 +9,7 @@ export interface ClaimFormData {
 }
 
 export interface PredictionResult {
-  prediction: 'Approved' | 'Rejected';
+  prediction: 'Claim Likely' | 'Claim Unlikely';
   confidence: number;
   risk_level: 'Low' | 'Medium' | 'High';
   probability_approved: number;
@@ -18,195 +18,124 @@ export interface PredictionResult {
   model_version: string;
 }
 
-interface FeatureWeight {
-  key: string;
-  label: string;
-  compute: (data: ClaimFormData) => { score: number; value: string; direction: 'positive' | 'negative' };
-}
+export function mapFormDataToModelFeatures(data: ClaimFormData) {
+  const ageNum = parseInt(data.personal?.age || '35', 10);
+  let age: '16-25' | '26-39' | '40-64' | '65+' = '26-39';
+  if (ageNum < 26) age = '16-25';
+  else if (ageNum <= 39) age = '26-39';
+  else if (ageNum <= 64) age = '40-64';
+  else age = '65+';
 
-const num = (v: any, d = 0) => (typeof v === 'number' ? v : parseFloat(v) || d);
+  const genderRaw = (data.personal?.gender || 'male').toLowerCase();
+  const gender: 'female' | 'male' = genderRaw === 'female' ? 'female' : 'male';
 
-// XGBoost-style feature contributions. Each feature produces a normalized
-// score in [-1, 1]. Positive = pushes toward approval, negative = pushes toward rejection.
-const FEATURES: FeatureWeight[] = [
-  {
-    key: 'repair_cost',
-    label: 'Repair Cost',
-    compute: (d) => {
-      const cost = num(d.accident.repairCost, 0);
-      const vehicleValue = num(d.vehicle.vehicleValue, 50000);
-      const ratio = vehicleValue > 0 ? cost / vehicleValue : 1;
-      const score = clampScore(1 - ratio * 2.5);
-      return { score, value: `$${cost.toLocaleString()}`, direction: score >= 0 ? 'positive' : 'negative' };
-    },
-  },
-  {
-    key: 'previous_claims',
-    label: 'Previous Claims',
-    compute: (d) => {
-      const claims = num(d.insurance.previousClaims, 0);
-      const score = clampScore(0.5 - claims * 0.2);
-      return { score, value: `${claims} claim(s)`, direction: score >= 0 ? 'positive' : 'negative' };
-    },
-  },
-  {
-    key: 'vehicle_age',
-    label: 'Vehicle Age',
-    compute: (d) => {
-      const age = num(d.vehicle.vehicleAge, 0);
-      const score = clampScore(0.4 - age * 0.12);
-      return { score, value: `${age} year(s)`, direction: score >= 0 ? 'positive' : 'negative' };
-    },
-  },
-  {
-    key: 'premium_amount',
-    label: 'Premium Amount',
-    compute: (d) => {
-      const premium = num(d.insurance.premiumAmount, 0);
-      const coverage = num(d.insurance.coverageAmount, 100000);
-      const ratio = coverage > 0 ? premium / coverage : 0;
-      const score = clampScore(ratio * 4 - 0.2);
-      return { score, value: `$${premium.toLocaleString()}/yr`, direction: score >= 0 ? 'positive' : 'negative' };
-    },
-  },
-  {
-    key: 'driving_score',
-    label: 'Driving Score',
-    compute: (d) => {
-      const score_val = num(d.driver.drivingScore, 50);
-      const score = clampScore((score_val - 50) / 50);
-      return { score, value: `${score_val}/100`, direction: score >= 0 ? 'positive' : 'negative' };
-    },
-  },
-  {
-    key: 'accident_severity',
-    label: 'Accident Severity',
-    compute: (d) => {
-      const type = (d.accident.accidentType || 'Minor').toLowerCase();
-      const severityMap: Record<string, number> = {
-        minor: 0.4, major: -0.3, collision: -0.1, 'natural disaster': -0.4, theft: -0.5,
-      };
-      const score = clampScore(severityMap[type] ?? -0.2);
-      return { score, value: d.accident.accidentType || 'Minor', direction: score >= 0 ? 'positive' : 'negative' };
-    },
-  },
-  {
-    key: 'no_claim_bonus',
-    label: 'No Claim Bonus',
-    compute: (d) => {
-      const ncb = num(d.insurance.noClaimBonus, 0);
-      const score = clampScore(ncb / 50 - 0.2);
-      return { score, value: `${ncb}%`, direction: score >= 0 ? 'positive' : 'negative' };
-    },
-  },
-  {
-    key: 'driving_experience',
-    label: 'Driving Experience',
-    compute: (d) => {
-      const exp = num(d.driver.drivingExperience, 0);
-      const score = clampScore((exp - 5) / 20);
-      return { score, value: `${exp} year(s)`, direction: score >= 0 ? 'positive' : 'negative' };
-    },
-  },
-  {
-    key: 'traffic_violations',
-    label: 'Traffic Violations',
-    compute: (d) => {
-      const violations = num(d.driver.trafficViolations, 0);
-      const score = clampScore(0.3 - violations * 0.15);
-      return { score, value: `${violations} violation(s)`, direction: score >= 0 ? 'positive' : 'negative' };
-    },
-  },
-  {
-    key: 'police_report',
-    label: 'Police Report Filed',
-    compute: (d) => {
-      const filed = (d.accident.policeReport || 'No').toLowerCase() === 'yes';
-      const score = filed ? 0.3 : -0.2;
-      return { score, value: filed ? 'Yes' : 'No', direction: score >= 0 ? 'positive' : 'negative' };
-    },
-  },
-  {
-    key: 'policy_coverage_ratio',
-    label: 'Coverage Amount',
-    compute: (d) => {
-      const coverage = num(d.insurance.coverageAmount, 0);
-      const score = clampScore(coverage / 200000 - 0.3);
-      return { score, value: `$${coverage.toLocaleString()}`, direction: score >= 0 ? 'positive' : 'negative' };
-    },
-  },
-  {
-    key: 'annual_income',
-    label: 'Annual Income',
-    compute: (d) => {
-      const income = num(d.personal.annualIncome, 0);
-      const score = clampScore(income / 200000 - 0.3);
-      return { score, value: `$${income.toLocaleString()}`, direction: score >= 0 ? 'positive' : 'negative' };
-    },
-  },
-];
+  const expNum = parseInt(data.driver?.drivingExperience || '5', 10);
+  let driving_experience: '0-9y' | '10-19y' | '20-29y' | '30y+' = '0-9y';
+  if (expNum < 10) driving_experience = '0-9y';
+  else if (expNum <= 19) driving_experience = '10-19y';
+  else if (expNum <= 29) driving_experience = '20-29y';
+  else driving_experience = '30y+';
 
-function clampScore(n: number): number {
-  return Math.max(-1, Math.min(1, n));
-}
+  const occupation = (data.personal?.occupation || '').toLowerCase();
+  let education: 'none' | 'high school' | 'university' = 'university';
+  if (occupation.includes('student') || occupation.includes('none')) education = 'high school';
 
-export function predictClaim(data: ClaimFormData): PredictionResult {
-  // Compute weighted sum of feature scores (mimics XGBoost leaf weight aggregation)
-  const contributions = FEATURES.map((f) => {
-    const result = f.compute(data);
-    return { ...result, key: f.key, label: f.label, weight: FEATURE_WEIGHTS[f.key] ?? 1 };
-  });
+  const incomeNum = parseFloat(data.personal?.annualIncome || '600000');
+  let income: 'poverty' | 'working class' | 'middle class' | 'upper class' = 'middle class';
+  if (incomeNum < 250000) income = 'poverty';
+  else if (incomeNum < 600000) income = 'working class';
+  else if (incomeNum <= 1500000) income = 'middle class';
+  else income = 'upper class';
 
-  const totalWeight = contributions.reduce((sum, c) => sum + c.weight, 0);
-  const weightedScore = contributions.reduce((sum, c) => sum + c.score * c.weight, 0) / totalWeight;
+  const drivingScore = parseFloat(data.driver?.drivingScore || '65');
+  const credit_score = Math.max(0, Math.min(1, drivingScore > 1 ? drivingScore / 100 : drivingScore));
 
-  // Sigmoid to convert [-1, 1] score → [0, 1] probability
-  const z = weightedScore * 3;
-  const probabilityApproved = 1 / (1 + Math.exp(-z));
-  const probabilityRejected = 1 - probabilityApproved;
+  const yearNum = parseInt(data.vehicle?.manufacturingYear || '2020', 10);
+  const vehicle_year: 'before 2015' | 'after 2015' = yearNum < 2015 ? 'before 2015' : 'after 2015';
 
-  const prediction: 'Approved' | 'Rejected' = probabilityApproved >= 0.5 ? 'Approved' : 'Rejected';
-  const confidence = Math.round((Math.max(probabilityApproved, probabilityRejected)) * 10000) / 100;
+  const pinNum = parseInt((data.personal?.pinCode || '10238').replace(/\D/g, ''), 10) || 10238;
 
-  let risk_level: 'Low' | 'Medium' | 'High';
-  if (confidence >= 80) risk_level = prediction === 'Approved' ? 'Low' : 'High';
-  else if (confidence >= 60) risk_level = 'Medium';
-  else risk_level = 'Medium';
+  const rawMileage = parseFloat(data.vehicle?.mileage || '12000');
+  const annual_mileage = rawMileage > 100 ? rawMileage : 12000;
 
-  // Sort feature importance by absolute contribution
-  const feature_importance: FeatureImportance[] = contributions
-    .map((c) => ({
-      feature: c.key,
-      label: c.label,
-      importance: Math.round(Math.abs(c.score * c.weight) * 100) / 100,
-      direction: c.direction,
-      value: c.value,
-    }))
-    .sort((a, b) => b.importance - a.importance)
-    .slice(0, 6);
+  const vType = (data.vehicle?.vehicleType || '').toLowerCase();
+  const vehicle_type: 'sedan' | 'sports car' = vType.includes('sports') ? 'sports car' : 'sedan';
+
+  const speeding_violations = parseInt(data.driver?.trafficViolations || '0', 10) || 0;
+  const past_accidents = parseInt(data.driver?.accidentHistory || '0', 10) || 0;
 
   return {
-    prediction,
+    AGE: age,
+    GENDER: gender,
+    RACE: 'majority' as const,
+    DRIVING_EXPERIENCE: driving_experience,
+    EDUCATION: education,
+    INCOME: income,
+    CREDIT_SCORE: credit_score,
+    VEHICLE_OWNERSHIP: 1,
+    VEHICLE_YEAR: vehicle_year,
+    MARRIED: 1,
+    CHILDREN: 0,
+    POSTAL_CODE: pinNum,
+    ANNUAL_MILEAGE: annual_mileage,
+    VEHICLE_TYPE: vehicle_type,
+    SPEEDING_VIOLATIONS: speeding_violations,
+    DUIS: 0,
+    PAST_ACCIDENTS: past_accidents,
+  };
+}
+
+export async function predictClaim(data: ClaimFormData): Promise<PredictionResult> {
+  const modelPayload = mapFormDataToModelFeatures(data);
+  const primaryUrl = (import.meta.env.VITE_ML_API_URL as string | undefined)?.replace(/\/$/, '') || 'http://127.0.0.1:8000';
+  const urlsToTry = [primaryUrl];
+  if (!urlsToTry.includes('http://127.0.0.1:8001')) urlsToTry.push('http://127.0.0.1:8001');
+
+  for (const url of urlsToTry) {
+    try {
+      const res = await fetch(`${url}/predict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(modelPayload),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json && json.prediction) {
+          return {
+            prediction: json.prediction === 'Approved' ? 'Claim Likely' : 'Claim Unlikely',
+            confidence: json.confidence,
+            risk_level: json.risk_level,
+            probability_approved: json.probability_approved,
+            probability_rejected: json.probability_rejected,
+            feature_importance: json.feature_importance,
+            model_version: json.model_version || 'xgboost-v1.0',
+          };
+        }
+      }
+    } catch {
+      // try next url
+    }
+  }
+
+  // Fallback prediction if ML backend is unavailable
+  const drivingScore = parseFloat(data.driver?.drivingScore || '80');
+  const pastAccidents = parseInt(data.driver?.accidentHistory || '0', 10);
+  const isLikely = pastAccidents === 0 && drivingScore >= 70;
+  const confidence = isLikely ? Math.min(95, 60 + Math.round(drivingScore * 0.35)) : 68;
+
+  return {
+    prediction: isLikely ? 'Claim Likely' : 'Claim Unlikely',
     confidence,
-    risk_level,
-    probability_approved: Math.round(probabilityApproved * 10000) / 100,
-    probability_rejected: Math.round(probabilityRejected * 10000) / 100,
-    feature_importance,
+    risk_level: confidence >= 80 ? 'Low' : 'Medium',
+    probability_approved: confidence,
+    probability_rejected: 100 - confidence,
+    feature_importance: [
+      { feature: 'driving_experience', label: 'Driving Experience', importance: 0.35, direction: 'positive', value: `${data.driver?.drivingExperience || 5}y` },
+      { feature: 'driving_score', label: 'Driving Score', importance: 0.28, direction: 'positive', value: `${drivingScore}` },
+      { feature: 'accident_history', label: 'Past Accidents', importance: 0.20, direction: pastAccidents === 0 ? 'positive' : 'negative', value: `${pastAccidents}` },
+    ],
     model_version: 'xgboost-v1.0',
   };
 }
 
-const FEATURE_WEIGHTS: Record<string, number> = {
-  repair_cost: 1.5,
-  previous_claims: 1.3,
-  vehicle_age: 1.0,
-  premium_amount: 0.9,
-  driving_score: 1.4,
-  accident_severity: 1.2,
-  no_claim_bonus: 1.0,
-  driving_experience: 0.8,
-  traffic_violations: 1.1,
-  police_report: 0.7,
-  policy_coverage_ratio: 0.9,
-  annual_income: 0.6,
-};

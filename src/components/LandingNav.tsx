@@ -50,7 +50,10 @@ export function LandingNav() {
             {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
           </button>
           <Button variant="ghost" size="sm" onClick={() => navigate('/login')} className="hidden sm:inline-flex">
-            Login
+            Customer Login
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => navigate('/company/login')} className="hidden sm:inline-flex border-primary-500 text-primary-600 dark:text-primary-400">
+            Company Portal
           </Button>
           <Button size="sm" onClick={() => navigate('/register')} className="hidden sm:inline-flex">
             Get Started

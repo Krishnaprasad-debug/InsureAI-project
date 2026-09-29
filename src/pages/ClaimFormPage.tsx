@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { supabase, type DocumentEntry, type TimelineEntry } from '../lib/supabase';
 import { predictClaim } from '../lib/prediction';
+import { saveLocalClaim, saveLocalPrediction } from '../lib/claimsSync';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input, Select, Textarea } from '../components/ui/Input';
@@ -155,7 +156,7 @@ export function ClaimFormPage() {
       ];
 
       // Run prediction
-      const prediction = predictClaim({
+      const prediction = await predictClaim({
         personal: formData.personal,
         vehicle: formData.vehicle,
         insurance: formData.insurance,
@@ -202,13 +203,29 @@ export function ClaimFormPage() {
 
       if (predError) throw predError;
 
-      // Insert notification
-      await supabase.from('notifications').insert({
-        user_id: profile.id,
-        title: 'Prediction Completed',
-        message: `Your claim ${claimNumber} has been analyzed. Prediction: ${prediction.prediction} (${prediction.confidence}% confidence)`,
-        type: 'success',
-      });
+      // Sync to local store for company officer visibility
+      saveLocalClaim({ ...claim, company_decision: 'Pending' } as any);
+      saveLocalPrediction(pred as any);
+
+      // Insert notifications
+      try {
+        await supabase.from('notifications').insert([
+          {
+            user_id: profile.id,
+            title: 'Claim Submitted',
+            message: `Your claim ${claimNumber} has been submitted successfully.`,
+            type: 'info',
+          },
+          {
+            user_id: profile.id,
+            title: 'AI Prediction Available',
+            message: `AI prediction is available for your claim ${claimNumber}. Prediction: ${prediction.prediction}. Risk: ${prediction.risk_level}.`,
+            type: 'success',
+          },
+        ]);
+      } catch (notifErr) {
+        console.warn('Customer notification notice:', notifErr);
+      }
 
       toast('success', 'Claim submitted!', 'AI prediction is ready.');
       navigate(`/claims/${claim.id}/result`, { state: { prediction: pred } });
@@ -221,7 +238,7 @@ export function ClaimFormPage() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-1">Submit a New Claim</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Submit a New Claim</h1>
         <p className="text-gray-500">Fill out the form below to get an AI-powered prediction.</p>
       </div>
 
@@ -238,7 +255,7 @@ export function ClaimFormPage() {
                   <div
                     className={cn(
                       'w-10 h-10 rounded-xl flex items-center justify-center transition-all',
-                      isComplete && 'bg-accent-500 text-white',
+                      isComplete && 'bg-primary-500 text-white',
                       isActive && 'bg-primary-600 text-white ring-4 ring-primary-100 dark:ring-primary-900/40',
                       !isComplete && !isActive && 'bg-gray-100 dark:bg-gray-800 text-gray-400',
                     )}
@@ -250,7 +267,7 @@ export function ClaimFormPage() {
                   </span>
                 </div>
                 {idx < STEPS.length - 1 && (
-                  <div className={cn('h-0.5 flex-1 mx-2 rounded-full transition-colors', isComplete ? 'bg-accent-500' : 'bg-gray-200 dark:bg-gray-800')} />
+                  <div className={cn('h-0.5 flex-1 mx-2 rounded-full transition-colors', isComplete ? 'bg-primary-500' : 'bg-gray-200 dark:bg-gray-800')} />
                 )}
               </div>
             );
@@ -494,7 +511,7 @@ export function ClaimFormPage() {
                   transition={{ delay: i * 0.5 }}
                   className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 justify-center"
                 >
-                  <Check className="w-4 h-4 text-accent-500" />
+                  <Check className="w-4 h-4 text-primary-500" />
                   {label}
                 </motion.div>
               ))}

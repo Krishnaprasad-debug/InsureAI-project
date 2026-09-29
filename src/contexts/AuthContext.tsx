@@ -7,10 +7,11 @@ interface AuthContextValue {
   profile: Profile | null;
   loading: boolean;
   isAdmin: boolean;
+  isCompany: boolean;
   signUp: (email: string, password: string, fullName: string, role?: UserRole) => Promise<{ error: string | null }>;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: (targetUserId?: string) => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: string | null }>;
 }
 
@@ -34,9 +35,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data as Profile | null;
   };
 
-  const refreshProfile = async () => {
-    if (session?.user?.id) {
-      const p = await fetchProfile(session.user.id);
+  const refreshProfile = async (targetUserId?: string) => {
+    const uid = targetUserId || session?.user?.id;
+    if (uid) {
+      const p = await fetchProfile(uid);
       setProfile(p);
     }
   };
@@ -80,20 +82,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
       options: {
-        data: { full_name: fullName },
+        data: { full_name: fullName, role },
       },
     });
     if (error) return { error: error.message };
 
-    // Set app metadata role via profile update after trigger creates the row
     if (data.user) {
-      // Wait briefly for trigger to create profile, then update role if admin
       await new Promise((r) => setTimeout(r, 500));
-      if (role === 'admin') {
-        await supabase.auth.updateUser({
-          data: { role: 'admin' },
-        });
-        await supabase.from('profiles').update({ role: 'admin' }).eq('id', data.user.id);
+      if (role === 'company') {
+        await supabase.from('profiles').update({
+          officer_title: 'Insurance Company Officer',
+          company_name: 'InsureAI Underwriting Division',
+        }).eq('id', data.user.id);
       }
     }
 
@@ -130,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         loading,
         isAdmin: profile?.role === 'admin',
+        isCompany: profile?.role === 'company',
         signUp,
         signIn,
         signOut,

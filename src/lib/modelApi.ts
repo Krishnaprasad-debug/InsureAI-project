@@ -33,8 +33,9 @@ export class ModelApiError extends Error {
   }
 }
 
-const modelApiUrl = (import.meta.env.VITE_MODEL_API_URL as string | undefined)?.replace(/\/$/, '')
-  ?? 'http://127.0.0.1:8001';
+const modelApiUrl = (import.meta.env.VITE_ML_API_URL as string | undefined)?.replace(/\/$/, '')
+  || (import.meta.env.VITE_MODEL_API_URL as string | undefined)?.replace(/\/$/, '')
+  || 'http://127.0.0.1:8000';
 
 export async function predictWithModel(input: ModelPredictionInput): Promise<ModelPredictionResponse> {
   let response: Response;

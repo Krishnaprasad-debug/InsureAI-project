@@ -11,7 +11,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
-export type UserRole = 'customer' | 'admin';
+export type UserRole = 'customer' | 'company' | 'admin';
 
 export interface Profile {
   id: string;
@@ -21,6 +21,8 @@ export interface Profile {
   phone: string | null;
   avatar_url: string | null;
   occupation: string | null;
+  company_name?: string | null;
+  officer_title?: string | null;
   annual_income: number | null;
   city: string | null;
   state: string | null;
@@ -32,12 +34,14 @@ export interface Profile {
 }
 
 export type ClaimStatus = 'pending' | 'under_review' | 'approved' | 'rejected';
+export type CompanyDecision = 'Pending' | 'Approved' | 'Rejected' | 'More Information Required';
 
 export interface Claim {
   id: string;
   user_id: string;
   claim_number: string;
   status: ClaimStatus;
+  company_decision?: CompanyDecision;
   personal_info: Record<string, any>;
   vehicle_details: Record<string, any>;
   insurance_details: Record<string, any>;
@@ -46,6 +50,8 @@ export interface Claim {
   documents: DocumentEntry[];
   timeline: TimelineEntry[];
   admin_remarks: string | null;
+  rejection_reason?: string | null;
+  officer_message?: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
   created_at: string;
@@ -73,7 +79,7 @@ export interface Prediction {
   id: string;
   claim_id: string;
   user_id: string;
-  prediction: 'Approved' | 'Rejected';
+  prediction: 'Claim Likely' | 'Claim Unlikely';
   confidence: number;
   risk_level: 'Low' | 'Medium' | 'High';
   probability_approved: number;
@@ -98,5 +104,7 @@ export interface Notification {
   message: string;
   type: string;
   read: boolean;
+  claim_id?: string;
+  target_role?: string;
   created_at: string;
 }

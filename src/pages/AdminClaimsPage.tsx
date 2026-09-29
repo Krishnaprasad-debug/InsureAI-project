@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { supabase, type Claim, type Prediction, type Profile } from '../lib/supabase';
+import { fetchAllClaimsMerged, fetchSingleClaimMerged, fetchSinglePredictionMerged } from '../lib/claimsSync';
 import { useToast } from '../contexts/ToastContext';
 import { Card, CardBody, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -27,11 +28,8 @@ export function AdminClaimsPage() {
 
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from('claims')
-        .select('*')
-        .order('created_at', { ascending: false });
-      setClaims(data as Claim[] || []);
+      const data = await fetchAllClaimsMerged(undefined, true);
+      setClaims(data);
       setLoading(false);
     })();
   }, []);
@@ -128,18 +126,19 @@ export function AdminClaimReviewPage() {
   useEffect(() => {
     (async () => {
       if (!id) return;
-      const [{ data: claimData }, { data: predData }] = await Promise.all([
-        supabase.from('claims').select('*').eq('id', id).maybeSingle(),
-        supabase.from('predictions').select('*').eq('claim_id', id).maybeSingle(),
+      const [claim, predData] = await Promise.all([
+        fetchSingleClaimMerged(id),
+        fetchSinglePredictionMerged(id),
       ]);
-      const claim = claimData as Claim | null;
       if (claim) {
-        const { data: profile } = await supabase.from('profiles').select('*').eq('id', claim.user_id).maybeSingle();
-        setUserProfile(profile as Profile | null);
+        if (claim.user_id) {
+          const { data: profile } = await supabase.from('profiles').select('*').eq('id', claim.user_id).maybeSingle();
+          setUserProfile(profile as Profile | null);
+        }
         setRemarks(claim.admin_remarks || '');
       }
       setClaim(claim);
-      setPrediction(predData as Prediction | null);
+      setPrediction(predData);
       setLoading(false);
     })();
   }, [id]);
@@ -217,7 +216,7 @@ export function AdminClaimReviewPage() {
     );
   }
 
-  const gaugeData = prediction ? [{ name: 'confidence', value: prediction.confidence, fill: prediction.prediction === 'Approved' ? '#10b981' : '#ef4444' }] : [];
+  const gaugeData = prediction ? [{ name: 'confidence', value: prediction.confidence, fill: prediction.prediction === 'Claim Likely' ? '#10b981' : '#ef4444' }] : [];
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto">
@@ -277,12 +276,12 @@ export function AdminClaimReviewPage() {
                 </div>
                 <div className="sm:col-span-2">
                   <div className="flex items-center gap-2 mb-3">
-                    {prediction.prediction === 'Approved' ? (
-                      <CheckCircle2 className="w-6 h-6 text-accent-600" />
+                    {prediction.prediction === 'Claim Likely' ? (
+                      <CheckCircle2 className="w-6 h-6 text-primary-600" />
                     ) : (
                       <XCircle className="w-6 h-6 text-danger-600" />
                     )}
-                    <span className={`text-xl font-bold ${prediction.prediction === 'Approved' ? 'text-accent-600' : 'text-danger-600'}`}>
+                    <span className={`text-xl font-bold ${prediction.prediction === 'Claim Likely' ? 'text-primary-600' : 'text-danger-600'}`}>
                       {prediction.prediction}
                     </span>
                     <Badge variant={prediction.risk_level === 'Low' ? 'success' : prediction.risk_level === 'High' ? 'danger' : 'warning'}>
@@ -292,7 +291,7 @@ export function AdminClaimReviewPage() {
                   <div className="space-y-2">
                     {prediction.feature_importance.slice(0, 4).map((f) => (
                       <div key={f.feature} className="flex items-center gap-2 text-sm">
-                        {f.direction === 'positive' ? <TrendingUp className="w-4 h-4 text-accent-500" /> : <TrendingDown className="w-4 h-4 text-danger-500" />}
+                        {f.direction === 'positive' ? <TrendingUp className="w-4 h-4 text-primary-500" /> : <TrendingDown className="w-4 h-4 text-danger-500" />}
                         <span className="text-gray-600 dark:text-gray-400 flex-1">{f.label}</span>
                         <span className="font-medium">{f.value}</span>
                       </div>

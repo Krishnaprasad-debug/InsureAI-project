@@ -16,7 +16,7 @@ const icons = {
 };
 
 const colors = {
-  success: 'text-accent-500 bg-accent-50 dark:bg-accent-900/20',
+  success: 'text-primary-500 bg-primary-50 dark:bg-primary-900/20',
   error: 'text-danger-500 bg-danger-50 dark:bg-danger-900/20',
   info: 'text-primary-500 bg-primary-50 dark:bg-primary-900/20',
   warning: 'text-warning-500 bg-warning-50 dark:bg-warning-500/10',
@@ -29,11 +29,17 @@ export function NotificationsPage() {
 
   const fetchNotifications = useCallback(async () => {
     if (!profile?.id) return;
-    const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', profile.id)
-      .order('created_at', { ascending: false });
+    const isCompanyRoute = window.location.pathname.startsWith('/company');
+    
+    let query = supabase.from('notifications').select('*').order('created_at', { ascending: false });
+    
+    if (isCompanyRoute) {
+      query = query.eq('target_role', 'company');
+    } else {
+      query = query.eq('user_id', profile.id);
+    }
+    
+    const { data } = await query;
     setNotifications(data as Notification[] || []);
     setLoading(false);
   }, [profile?.id]);
@@ -42,7 +48,14 @@ export function NotificationsPage() {
 
   const markAllRead = async () => {
     if (!profile?.id) return;
-    await supabase.from('notifications').update({ read: true }).eq('user_id', profile.id).eq('read', false);
+    const isCompanyRoute = window.location.pathname.startsWith('/company');
+    let query = supabase.from('notifications').update({ read: true }).eq('read', false);
+    if (isCompanyRoute) {
+      query = query.eq('target_role', 'company');
+    } else {
+      query = query.eq('user_id', profile.id);
+    }
+    await query;
     fetchNotifications();
   };
 

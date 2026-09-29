@@ -6,8 +6,8 @@ type Status = 'pending' | 'under_review' | 'approved' | 'rejected';
 
 const statusConfig: Record<Status, { label: string; variant: string; dot: string }> = {
   pending: { label: 'Pending', variant: 'bg-warning-100 text-warning-600 dark:bg-warning-500/20 dark:text-warning-400', dot: 'bg-warning-500' },
-  under_review: { label: 'Under Review', variant: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300', dot: 'bg-blue-500' },
-  approved: { label: 'Approved', variant: 'bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300', dot: 'bg-accent-500' },
+  under_review: { label: 'Under Review', variant: 'bg-secondary-100 text-secondary-700 dark:bg-secondary-900/40 dark:text-secondary-300', dot: 'bg-secondary-500' },
+  approved: { label: 'Approved', variant: 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300', dot: 'bg-primary-500' },
   rejected: { label: 'Rejected', variant: 'bg-danger-100 text-danger-700 dark:bg-danger-900/40 dark:text-danger-300', dot: 'bg-danger-500' },
 };
 

@@ -16,8 +16,16 @@ import { AdminClaimsPage, AdminClaimReviewPage } from './pages/AdminClaimsPage';
 import { AdminUsersPage } from './pages/AdminUsersPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 
-function ProtectedRoute({ children, admin = false }: { children: ReactNode; admin?: boolean }) {
-  const { session, loading, isAdmin } = useAuth();
+import { CompanyDashboardPage } from './pages/company/CompanyDashboardPage';
+import { CompanyClaimsPage } from './pages/company/CompanyClaimsPage';
+import { CompanyClaimDetailPage } from './pages/company/CompanyClaimDetailPage';
+import { CompanyPendingPage } from './pages/company/CompanyPendingPage';
+import { CompanyPredictionsPage } from './pages/company/CompanyPredictionsPage';
+import { CompanyAnalyticsPage } from './pages/company/CompanyAnalyticsPage';
+import { CompanyProfilePage } from './pages/company/CompanyProfilePage';
+
+function ProtectedRoute({ children, admin, company }: { children: ReactNode; admin?: boolean; company?: boolean }) {
+  const { session, loading, isAdmin, isCompany } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -36,6 +44,10 @@ function ProtectedRoute({ children, admin = false }: { children: ReactNode; admi
     return <Navigate to="/dashboard" replace />;
   }
 
+  if (company && !isCompany) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -44,6 +56,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/company/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
@@ -56,6 +69,18 @@ function AppRoutes() {
         <Route path="/claims/:id/result" element={<PredictionResultPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/notifications" element={<NotificationsPage />} />
+      </Route>
+
+      {/* Company Officer routes */}
+      <Route element={<ProtectedRoute company><AppLayout company /></ProtectedRoute>}>
+        <Route path="/company/dashboard" element={<CompanyDashboardPage />} />
+        <Route path="/company/claims" element={<CompanyClaimsPage />} />
+        <Route path="/company/claims/:id" element={<CompanyClaimDetailPage />} />
+        <Route path="/company/pending" element={<CompanyPendingPage />} />
+        <Route path="/company/predictions" element={<CompanyPredictionsPage />} />
+        <Route path="/company/analytics" element={<CompanyAnalyticsPage />} />
+        <Route path="/company/profile" element={<CompanyProfilePage />} />
+        <Route path="/company/notifications" element={<NotificationsPage />} />
       </Route>
 
       {/* Admin routes */}

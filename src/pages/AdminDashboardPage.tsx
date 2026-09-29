@@ -16,7 +16,7 @@ import { StatusBadge } from '../components/ui/Misc';
 import { SkeletonCard } from '../components/ui/Skeleton';
 import { timeAgo } from '../lib/utils';
 
-const COLORS = ['#2563eb', '#10b981', '#f59e0b', '#ef4444'];
+const COLORS = ['#9333ea', '#10b981', '#f97316', '#ef4444'];
 
 export function AdminDashboardPage() {
   const [claims, setClaims] = useState<Claim[]>([]);
@@ -94,7 +94,7 @@ export function AdminDashboardPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <StatCard label="Total Users" value={stats.totalUsers} icon={<Users className="w-5 h-5" />} color="primary" />
-          <StatCard label="Total Claims" value={stats.totalClaims} icon={<FileText className="w-5 h-5" />} color="info" />
+          <StatCard label="Total Claims" value={stats.totalClaims} icon={<FileText className="w-5 h-5" />} color="secondary" />
           <StatCard label="Pending" value={stats.pendingClaims} icon={<Clock className="w-5 h-5" />} color="warning" />
           <StatCard label="Approved" value={stats.approvedClaims} icon={<CheckCircle2 className="w-5 h-5" />} color="accent" />
           <StatCard label="Rejected" value={stats.rejectedClaims} icon={<XCircle className="w-5 h-5" />} color="danger" />
@@ -120,7 +120,7 @@ export function AdminDashboardPage() {
                   <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" allowDecimals={false} />
                   <Tooltip contentStyle={{ borderRadius: '12px', fontSize: '12px' }} />
                   <Legend wrapperStyle={{ fontSize: '12px' }} />
-                  <Line type="monotone" dataKey="claims" stroke="#2563eb" strokeWidth={2} dot={{ r: 4 }} />
+                  <Line type="monotone" dataKey="claims" stroke="#9333ea" strokeWidth={2} dot={{ r: 4 }} />
                   <Line type="monotone" dataKey="approved" stroke="#10b981" strokeWidth={2} dot={{ r: 4 }} />
                   <Line type="monotone" dataKey="rejected" stroke="#ef4444" strokeWidth={2} dot={{ r: 4 }} />
                 </LineChart>
@@ -163,7 +163,7 @@ export function AdminDashboardPage() {
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#9ca3af" />
                   <YAxis tick={{ fontSize: 12 }} stroke="#9ca3af" allowDecimals={false} />
                   <Tooltip contentStyle={{ borderRadius: '12px', fontSize: '12px' }} />
-                  <Bar dataKey="value" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="value" fill="#9333ea" radius={[6, 6, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (

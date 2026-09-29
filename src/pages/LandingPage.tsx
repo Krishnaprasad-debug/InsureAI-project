@@ -59,7 +59,7 @@ export function LandingPage() {
       <section id="home" className="relative pt-32 pb-20 overflow-hidden">
         <div className="absolute inset-0 bg-grid-pattern opacity-30 dark:opacity-10" />
         <div className="absolute top-20 right-10 w-72 h-72 bg-primary-500/20 rounded-full blur-3xl animate-pulse-slow" />
-        <div className="absolute bottom-10 left-10 w-96 h-96 bg-accent-500/10 rounded-full blur-3xl animate-pulse-slow" />
+        <div className="absolute bottom-10 left-10 w-96 h-96 bg-primary-500/10 rounded-full blur-3xl animate-pulse-slow" />
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
@@ -118,18 +118,18 @@ export function LandingPage() {
                         <span className="text-gray-500">{row.label}</span>
                         <div className="flex items-center gap-2">
                           <span className="font-medium">{row.value}</span>
-                          <span className="text-accent-600 text-xs">↑</span>
+                          <span className="text-primary-600 text-xs">↑</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-                <div className="p-8 bg-gradient-to-br from-primary-50 to-accent-50 dark:from-gray-800 dark:to-gray-900 flex flex-col items-center justify-center">
+                <div className="p-8 bg-gradient-to-br from-primary-50 to-primary-50 dark:from-gray-800 dark:to-gray-900 flex flex-col items-center justify-center">
                   <p className="text-sm text-gray-500 mb-2">Prediction Result</p>
                   <div className="text-5xl font-bold gradient-text mb-2">Approved</div>
-                  <div className="text-3xl font-bold text-accent-600 mb-4">94.63%</div>
+                  <div className="text-3xl font-bold text-primary-600 mb-4">94.63%</div>
                   <div className="w-full bg-white dark:bg-gray-800 rounded-full h-2 mb-2">
-                    <div className="h-full rounded-full bg-gradient-to-r from-primary-500 to-accent-500" style={{ width: '94.63%' }} />
+                    <div className="h-full rounded-full bg-gradient-to-r from-primary-500 to-primary-500" style={{ width: '94.63%' }} />
                   </div>
                   <p className="text-xs text-gray-500">Confidence Score</p>
                 </div>
@@ -248,7 +248,7 @@ export function LandingPage() {
                     ))}
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-accent-500 flex items-center justify-center text-white text-sm font-semibold">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary-500 to-primary-500 flex items-center justify-center text-white text-sm font-semibold">
                       {t.name.charAt(0)}
                     </div>
                     <div>
@@ -309,8 +309,8 @@ export function LandingPage() {
               <div className="space-y-3">
                 {['Real-time AI prediction with confidence scores', 'Complete claim lifecycle management', 'Beautiful analytics and reporting', 'Bank-grade security and encryption'].map((item) => (
                   <div key={item} className="flex items-center gap-3">
-                    <div className="w-5 h-5 rounded-full bg-accent-100 dark:bg-accent-900/40 flex items-center justify-center">
-                      <Check className="w-3 h-3 text-accent-600" />
+                    <div className="w-5 h-5 rounded-full bg-primary-100 dark:bg-primary-900/40 flex items-center justify-center">
+                      <Check className="w-3 h-3 text-primary-600" />
                     </div>
                     <span className="text-sm">{item}</span>
                   </div>
