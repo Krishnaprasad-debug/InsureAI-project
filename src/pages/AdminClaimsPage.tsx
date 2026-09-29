@@ -18,7 +18,7 @@ import { Badge } from '../components/ui/Badge';
 import { StatusBadge } from '../components/ui/Misc';
 import { Modal } from '../components/ui/Modal';
 import { Textarea } from '../components/ui/Input';
-import { formatDate, formatDateTime, initials } from '../lib/utils';
+import { formatDate, formatDateTime, initials, formatCurrency } from '../lib/utils';
 
 export function AdminClaimsPage() {
   const navigate = useNavigate();
@@ -88,7 +88,7 @@ export function AdminClaimsPage() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Repair Cost</span>
-                    <span className="font-medium">${claim.accident_details?.repairCost || '—'}</span>
+                    <span className="font-medium">{claim.accident_details?.repairCost ? formatCurrency(claim.accident_details.repairCost) : '—'}</span>
                   </div>
                 </div>
                 <Button variant="outline" size="sm" className="w-full" onClick={() => navigate(`/admin/claims/${claim.id}`)}>
@@ -316,12 +316,20 @@ export function AdminClaimReviewPage() {
             <CardHeader><CardTitle>{section.label}</CardTitle></CardHeader>
             <CardBody>
               <div className="grid grid-cols-2 gap-3 text-sm">
-                {section.fields.map((field) => (
-                  <div key={field}>
-                    <p className="text-xs text-gray-400 capitalize">{field.replace(/([A-Z])/g, ' $1')}</p>
-                    <p className="font-medium">{(section.data as any)?.[field] || '—'}</p>
-                  </div>
-                ))}
+                {section.fields.map((field) => {
+                  const val = (section.data as any)?.[field];
+                  const isMonetary = ['annualIncome', 'vehicleValue', 'premiumAmount', 'coverageAmount', 'repairCost'].includes(field);
+                  return (
+                    <div key={field}>
+                      <p className="text-xs text-gray-400 capitalize">{field.replace(/([A-Z])/g, ' $1')}</p>
+                      <p className="font-medium">
+                        {isMonetary && val !== undefined && val !== null && val !== ''
+                          ? formatCurrency(val)
+                          : val || '—'}
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </CardBody>
           </Card>

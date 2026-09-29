@@ -13,7 +13,7 @@ import { saveLocalClaim, saveLocalPrediction } from '../lib/claimsSync';
 import { Button } from '../components/ui/Button';
 import { Card } from '../components/ui/Card';
 import { Input, Select, Textarea } from '../components/ui/Input';
-import { cn, formatBytes, generateClaimNumber } from '../lib/utils';
+import { cn, formatBytes, generateClaimNumber, formatCurrency } from '../lib/utils';
 
 const STEPS = [
   { id: 0, label: 'Personal', icon: User },
@@ -436,12 +436,20 @@ export function ClaimFormPage() {
                             <h3 className="font-medium">{section.label}</h3>
                           </div>
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-sm">
-                            {section.fields.map((field) => (
-                              <div key={field}>
-                                <span className="text-gray-400 capitalize">{field.replace(/([A-Z])/g, ' $1')}: </span>
-                                <span className="font-medium">{(section.data as any)[field] || '—'}</span>
-                              </div>
-                            ))}
+                            {section.fields.map((field) => {
+                              const val = (section.data as any)[field];
+                              const isMonetary = ['annualIncome', 'vehicleValue', 'premiumAmount', 'coverageAmount', 'repairCost'].includes(field);
+                              return (
+                                <div key={field}>
+                                  <span className="text-gray-400 capitalize">{field.replace(/([A-Z])/g, ' $1')}: </span>
+                                  <span className="font-medium">
+                                    {isMonetary && val !== undefined && val !== null && val !== ''
+                                      ? formatCurrency(val)
+                                      : val || '—'}
+                                  </span>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       );

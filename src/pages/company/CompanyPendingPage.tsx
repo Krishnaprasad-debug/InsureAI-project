@@ -11,7 +11,7 @@ import { fetchAllClaimsMerged, fetchAllPredictionsMerged, saveLocalClaim, saveLo
 import { Card } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
-import { formatDate } from '../../lib/utils';
+import { formatDate, formatCurrency } from '../../lib/utils';
 
 const TEST_CUSTOMER_ID = '379b91fc-63b9-45b8-9e31-1b48a811abd5';
 const TEST_CUSTOMER_EMAIL = 'rahul.sharma@insureai.com';
@@ -363,7 +363,7 @@ export function CompanyPendingPage() {
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Repair Cost</span>
-                      <span className="font-medium">${claim.accident_details?.repairCost || '—'}</span>
+                      <span className="font-medium">{claim.accident_details?.repairCost ? formatCurrency(claim.accident_details.repairCost) : '—'}</span>
                     </div>
 
                     <div className="pt-2 border-t border-gray-100 dark:border-gray-800 flex justify-between items-center">

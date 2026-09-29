@@ -127,7 +127,7 @@ export function ProfilePage() {
             <Input label="Email" icon={<Mail className="w-4 h-4" />} value={profile?.email || ''} disabled hint="Email cannot be changed" />
             <Input label="Phone" icon={<Phone className="w-4 h-4" />} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="+91 98765 43210" />
             <Input label="Occupation" icon={<Briefcase className="w-4 h-4" />} value={form.occupation} onChange={(e) => setForm({ ...form, occupation: e.target.value })} />
-            <Input label="Annual Income ($)" type="number" value={form.annual_income} onChange={(e) => setForm({ ...form, annual_income: e.target.value })} />
+            <Input label="Annual Income (₹)" type="number" value={form.annual_income} onChange={(e) => setForm({ ...form, annual_income: e.target.value })} />
             <Input label="City" icon={<MapPin className="w-4 h-4" />} value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
             <Input label="State" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} />
             <Input label="PIN Code" value={form.pin_code} onChange={(e) => setForm({ ...form, pin_code: e.target.value })} />

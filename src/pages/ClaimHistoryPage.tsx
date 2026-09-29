@@ -13,7 +13,7 @@ import { Input } from '../components/ui/Input';
 import { StatusBadge } from '../components/ui/Misc';
 import { Badge } from '../components/ui/Badge';
 import { SkeletonCard } from '../components/ui/Skeleton';
-import { formatDate, downloadFile } from '../lib/utils';
+import { formatDate, downloadFile, formatCurrency } from '../lib/utils';
 
 const PAGE_SIZE = 8;
 
@@ -431,12 +431,20 @@ export function ClaimDetailPage() {
               {section.label}
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {section.fields.map((field) => (
-                <div key={field}>
-                  <p className="text-xs text-gray-400 capitalize">{field.replace(/([A-Z])/g, ' $1')}</p>
-                  <p className="text-sm font-medium">{(section.data as any)?.[field] || '—'}</p>
-                </div>
-              ))}
+              {section.fields.map((field) => {
+                const val = (section.data as any)?.[field];
+                const isMonetary = ['annualIncome', 'vehicleValue', 'premiumAmount', 'coverageAmount', 'repairCost'].includes(field);
+                return (
+                  <div key={field}>
+                    <p className="text-xs text-gray-400 capitalize">{field.replace(/([A-Z])/g, ' $1')}</p>
+                    <p className="text-sm font-medium">
+                      {isMonetary && val !== undefined && val !== null && val !== ''
+                        ? formatCurrency(val)
+                        : val || '—'}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </CardBody>
         </Card>

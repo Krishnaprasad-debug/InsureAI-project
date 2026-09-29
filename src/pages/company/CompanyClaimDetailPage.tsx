@@ -14,7 +14,7 @@ import { Button } from '../../components/ui/Button';
 import { Badge } from '../../components/ui/Badge';
 import { Modal } from '../../components/ui/Modal';
 import { Textarea } from '../../components/ui/Input';
-import { formatDateTime, formatBytes } from '../../lib/utils';
+import { formatDateTime, formatBytes, formatCurrency } from '../../lib/utils';
 
 export function CompanyClaimDetailPage() {
   const { id } = useParams();
@@ -337,7 +337,7 @@ export function CompanyClaimDetailPage() {
             <DetailRow label="Age" value={claim.personal_info?.age} />
             <DetailRow label="Gender" value={claim.personal_info?.gender} />
             <DetailRow label="Occupation" value={claim.personal_info?.occupation || customerProfile?.occupation} />
-            <DetailRow label="Annual Income" value={claim.personal_info?.annualIncome ? `$${Number(claim.personal_info.annualIncome).toLocaleString()}` : null} />
+            <DetailRow label="Annual Income" value={claim.personal_info?.annualIncome ? formatCurrency(claim.personal_info.annualIncome) : null} />
             <DetailRow label="City" value={claim.personal_info?.city} />
             <DetailRow label="State" value={claim.personal_info?.state} />
             <DetailRow label="PIN Code" value={claim.personal_info?.pinCode} />
@@ -361,7 +361,7 @@ export function CompanyClaimDetailPage() {
             <DetailRow label="Fuel Type" value={claim.vehicle_details?.fuelType} />
             <DetailRow label="Transmission" value={claim.vehicle_details?.transmission} />
             <DetailRow label="Engine Capacity" value={claim.vehicle_details?.engineCapacity ? `${claim.vehicle_details.engineCapacity} cc` : null} />
-            <DetailRow label="Estimated Value" value={claim.vehicle_details?.vehicleValue ? `$${Number(claim.vehicle_details.vehicleValue).toLocaleString()}` : null} />
+            <DetailRow label="Estimated Value" value={claim.vehicle_details?.vehicleValue ? formatCurrency(claim.vehicle_details.vehicleValue) : null} />
             <DetailRow label="Mileage" value={claim.vehicle_details?.mileage ? `${claim.vehicle_details.mileage} km/l` : null} />
           </CardBody>
         </Card>
@@ -377,8 +377,8 @@ export function CompanyClaimDetailPage() {
           <CardBody className="space-y-2 text-sm">
             <DetailRow label="Policy Type" value={claim.insurance_details?.policyType} />
             <DetailRow label="Policy Duration" value={claim.insurance_details?.policyDuration} />
-            <DetailRow label="Premium Amount" value={claim.insurance_details?.premiumAmount ? `$${Number(claim.insurance_details.premiumAmount).toLocaleString()}` : null} />
-            <DetailRow label="Coverage Amount" value={claim.insurance_details?.coverageAmount ? `$${Number(claim.insurance_details.coverageAmount).toLocaleString()}` : null} />
+            <DetailRow label="Premium Amount" value={claim.insurance_details?.premiumAmount ? formatCurrency(claim.insurance_details.premiumAmount) : null} />
+            <DetailRow label="Coverage Amount" value={claim.insurance_details?.coverageAmount ? formatCurrency(claim.insurance_details.coverageAmount) : null} />
             <DetailRow label="No Claim Bonus" value={claim.insurance_details?.noClaimBonus ? `${claim.insurance_details.noClaimBonus}%` : null} />
             <DetailRow label="Previous Claims" value={claim.insurance_details?.previousClaims} />
             <DetailRow label="Insurance Provider" value={claim.insurance_details?.insuranceCompany} />
@@ -417,7 +417,7 @@ export function CompanyClaimDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <DetailRow label="Accident Type" value={claim.accident_details?.accidentType} />
             <DetailRow label="Accident Date" value={claim.accident_details?.date} />
-            <DetailRow label="Repair Cost" value={claim.accident_details?.repairCost ? `$${Number(claim.accident_details.repairCost).toLocaleString()}` : null} />
+            <DetailRow label="Repair Cost" value={claim.accident_details?.repairCost ? formatCurrency(claim.accident_details.repairCost) : null} />
             <DetailRow label="Police Report Filed" value={claim.accident_details?.policeReport} />
             <DetailRow label="Hospitalization Required" value={claim.accident_details?.hospitalization} />
             <DetailRow label="Third Party Damage" value={claim.accident_details?.thirdPartyDamage} />
