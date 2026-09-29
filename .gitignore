@@ -22,3 +22,10 @@ dist-ssr
 *.sw?
 .env
 .venv/
+test.pkl
+test_api.py
+test_api_predict.py
+test_load.py
+find_currency.cjs
+__pycache__/
+*.pyc
